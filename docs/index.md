@@ -82,3 +82,10 @@ simple rule (shorter diagonal in any scaling, or Delaunay, reproduces it), so ke
 * Memory: all seven `100^4` arrays plus the per-thread yield arrays (about 5.6 GB in total).
 * `run_dileptons.slurm` ignores its first argument (see above); the job name and `--partition` are cluster specific.
 * Rapp-type `ImDvec` headers mention `mu_B` and `rhoN_eff`; the code identifies the table density only via the order of the blocks (`nTs.dat`), not by reading these header lines.
+
+## Publications and sources of the tables
+
+See the README for the full reference list (`references.bib` has the BibTeX): the code was used for the dilepton yields and elliptic flow in
+Savchuk et al., J. Phys. G 50, 125104 (2023) (arXiv:2209.05267) and Reichert et al., Phys. Lett. B (2023) (arXiv:2302.13919). The vector-meson spectral functions in
+`TriangFiles/` are the Rapp-Wambach-van Hees in-medium spectral functions (Eur. Phys. J. A 6, 415; Nucl. Phys. A 806, 339; Adv. High Energy Phys. 2013, 148253).
+
