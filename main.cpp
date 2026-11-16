@@ -55,7 +55,7 @@ void read_cells_element(std::string element,std::vector<std::vector<std::vector<
 	}
 }
 
-void momenta_integration(std::vector<std::vector<std::vector<std::vector<double>>>>& yields, double Nemp, double Temp, std::vector<double> v, double phi0, double lpion, dileptons llbar)
+void momenta_integration(std::vector<std::vector<std::vector<std::vector<double>>>>& yields, double Nemp, double Temp, std::vector<double> v, double phi0, double lpion, dileptons& llbar)
 {
 	double ymax = .5;
 	int beansM = 89;
@@ -86,37 +86,37 @@ void momenta_integration(std::vector<std::vector<std::vector<std::vector<double>
 		4.25e+03, 4.50e+03, 4.75e+03, 5.00e+03 };
 	
 
-	std::vector<double> q(3, 0);
-		int triang_num = llbar.get_Triangle(Nemp, Temp);
-		for (int i = 1; i < beansM; i++)
+	// Fast path: triangle search + planar (n,T) interpolation of the spectral function once per cell,
+	// then only a bilinear (M,Q) interpolation per phase-space point (see dileptons::set_cell / emission_cell).
+	llbar.set_cell(Nemp, Temp);
+	double cos2[36], cosT[36], rate[36];               // v2 weight = cos(2(theta + phi0)), independent of pT
+	for (int l = -18; l < 18; l++)
+	{
+		cos2[l + 18] = cos(2 * ((l + .5) * PI / 18 + phi0));
+		cosT[l + 18] = cos((l + .5) * PI / 18);
+	}
+	for (int i = 1; i < beansM; i++)
+	{
+		double M = Mbins[i];
+		for (int j = 1; j < beansQ; j++)
 		{
-			double M = Mbins[i];
-			for (int j = 1; j < beansQ; j++)
+			double pt = Qbins[j];
+			for (int k = 0; k < beansQ; k++)
 			{
-				double pt = Qbins[j];
-				for (int k = 0; k < beansQ; k++)
+				double y = -ymax + 2 * ymax / beansQ * (k + .5);
+				llbar.emission_cell_theta(M, pt, y, v[0], v[1], v[2], cosT, 36, rate);
+				double s0 = 0, s1 = 0;
+				for (int l = 0; l < 36; l++)
 				{
-					double y = -ymax + 2 * ymax / beansQ * (k + .5);
-					for (int l = -18; l < 18; l++)
-					{
-						double theta = (l + .5) * PI / 18;
-						q[0] = M;
-						q[1] = pt;
-						q[2] = y;
-						double tv2 = v2(q, phi0, theta);
-						double tR = 1. / 36 * lpion * llbar.emmision(q, v, triang_num, Nemp, Temp, theta);
-						yields[0][i][j][k] += tR;
-						yields[1][i][j][k] += tv2 * tR;
-						//std::cout << yields[i][j][k] << std::endl;
-					}
+					double tR = 1. / 36 * lpion * rate[l];
+					s0 += tR;
+					s1 += cos2[l] * tR;
 				}
+				yields[0][i][j][k] += s0;
+				yields[1][i][j][k] += s1;
 			}
 		}
-
-
-		
-	
-
+	}
 }
 void output_PT(std::string path, int t, std::vector<std::vector<std::vector<std::vector<std::vector<double>>>>>& yields, int num_threads)
 {

@@ -50,7 +50,13 @@ class spectralFunction
     double LinearInterpolate(double, double, double, double, std::vector<std::vector<double>>&);
     void readEvent(std::vector<std::vector<double>>&, std::ifstream&);
     void readHeader(std::ifstream& );
+    int last_triangle = -1;                 // triangle of the previous lookup (neighbouring cells share it)
+    static int upper_bin(const double* edges, int num, double x);
 public:
+    // Fast path: the planar (n,T) interpolation is linear in the tables, so for a fixed cell it is done once
+    // (cell_table), and each (M,Q) evaluation is only a bilinear interpolation (spectral_function_cell).
+    void cell_table(double n, double T, int k, std::vector<double>& out);          // out: num_Mbins*num_Qbins, row = M bin
+    double spectral_function_cell(const std::vector<double>& cell, int k, double M, double Q) const;
     void set_table(std::string, int,int);
     double spectral_function(double, double, int , double , double );
     int Triangle(double, double);

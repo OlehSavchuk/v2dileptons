@@ -44,6 +44,25 @@ Output: `<data_dir>/rho-V2-<t>.bin` (text, tab-separated: `M  pT  yield  v2*yiel
 `spectralFunction::set_table` reads every second file (the array `Ts[15] = 40, 50, ..., 180`) and every fifth density block (`frequency_Ns = 5`, 57 blocks -> 12), which gives the 180 points of `nTs.dat`.
 Interpolation: planar interpolation in `(n, T)` over the triangle that contains the point, then bilinear in `(M, pT)` between the surrounding bins.
 
+## Performance notes
+
+* `dileptons::get_Triangle` / `spectralFunction::Triangle` is a linear scan over the 308 triangles, called **once per cell**. It now tries the previous cell's triangle first
+  (neighbouring cells have similar `(n, T)`), but this is a minor effect: the time is dominated by the 4.9 million emission evaluations per cell.
+* Originally every evaluation built several `std::vector`s, did linear scans for the `M` and `pT` bins and repeated the planar `(n, T)` interpolation four times, and
+  `momenta_integration` took the `dileptons` object **by value**, i.e. copied the whole spectral-function table (about 6 MB) for every cell.
+* Now: `dileptons::set_cell(n, T)` finds the triangle and combines the three tables with the barycentric weights into one `89 x 40` array
+  (planar interpolation is linear in the table values, so this is exact); `emission_cell_theta` evaluates all 36 azimuth angles of one `(M, pT, y)` with the
+  `cosh/sinh/sqrt` terms hoisted and a bilinear `(M, Q)` interpolation using `std::upper_bound` for the bins. The v2 weight `(px^2 - py^2)/(px^2 + py^2)` equals `cos(2(theta + phi0))`, so it is computed once per angle.
+  The old per-point functions (`emmision`, `spectral_function`) are kept and used by `make test` as the reference.
+* Result: relative difference to the original rates 4e-14 (random cells, including cells outside the triangulated region), 0.015 s instead of about 0.4 s per cell.
+  Further speed-up is possible by caching `exp(E*/T)`, which is the largest remaining cost, or by a tabulated `Im D` on a `(M, Q)` grid shared by all cells with the same triangle.
+
+## Triangulation (`tools/triangulation.py`)
+
+`triangles.dat` has a strip structure: 15 temperature rows with 12 densities each; between neighbouring rows every one of the 11 quadrilaterals is cut into two
+triangles along one diagonal (14 strips x 11 x 2 = 308). The notebook that originally produced the file is not in this repository, and the choice of diagonals does not follow a
+simple rule (shorter diagonal in any scaling, or Delaunay, reproduces it), so keep the shipped file. `python3 tools/triangulation.py` verifies it; `--write <file>` writes a new strip triangulation with shorter diagonals.
+
 ## Cluster scripts
 
 `dileptons.sh` is a SLURM batch script (20 tasks, 1 GB each, 40 h); it runs `./a.out $SCRATCHDIR/Dileptons <t_start> <t_end> 20` with `t_start`, `t_end` taken from its 2nd and 3rd argument.

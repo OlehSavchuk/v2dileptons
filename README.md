@@ -19,7 +19,9 @@ triangulation of the grid in the `(n, T)` plane (`triangles.dat`), then bilinear
 | `TriangFiles/` | Spectral-function tables and the `(n, T)` triangulation (see below) |
 | `dileptons.sh` | SLURM job script (20 tasks, 40 h) |
 | `dileptons-script.bash` | Prints the `sbatch` lines for 3 EoS variants times 5 beam energies |
-| `Makefile` | `make` builds `a.out` |
+| `Makefile` | `make` builds `a.out`, `make test` checks the fast path against the original rate (needs the `ImDvec` tables) |
+| `tests/test_fast.cpp` | Compares `emmision` with the per-cell fast path and times both |
+| `tools/triangulation.py` | Verifies `triangles.dat` (strip structure, coverage) and can write a new strip triangulation |
 | `docs/index.md` | Detailed documentation |
 
 ## Build and run
@@ -33,6 +35,13 @@ make                                   # g++ -O2 -std=c++14 -fopenmp ...
   `T.dat`, `n.dat`, `gamma.dat`, `vx.dat`, `vy.dat`, `vz.dat`, `pion.dat`. Memory use is about 5.6 GB (all seven arrays are held at once).
 * the program must be started from the folder that contains `TriangFiles/` (path `./TriangFiles/` is hard coded in `dileptons::init`).
 * output: `<data_dir>/rho-V2-<t>.bin` for every time step `t` (a text file despite the extension): columns `M`, `pT`, yield, `v2`-weighted yield.
+
+## Speed
+
+The triangle search itself (once per cell, 308 triangles) was never the bottleneck: the cost is the 4.9 million emission evaluations per cell
+(88 `M` x 39 `pT` x 40 `y` x 36 azimuth bins). The code now does the triangle search and the planar `(n, T)` interpolation of the whole
+`M x pT` table once per cell, hoists everything that does not depend on the azimuth out of the inner loop, and uses binary search for the bins.
+`make test`: results agree with the original `dileptons::emmision` to 4e-14 (relative), and one cell takes about 0.015 s instead of about 0.4 s (25x).
 
 ## Data
 

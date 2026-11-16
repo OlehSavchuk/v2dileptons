@@ -1,4 +1,5 @@
 #include "spectral_func.h"
+#include <algorithm>
 
 int spectralFunction::Mbin(double M)
 {
@@ -196,8 +197,45 @@ double spectralFunction::spectral_function(double M, double Q, int k, double n, 
 	std::cout << "triangle:" << nT[triangle[2]][0] << " " << nT[triangle[2]][1] << std::endl;*/
 	return g*spectralFunction::LinearInterpolate(M-Mbins[i-1], Q - Qbins[j - 1], Mbins[i]-Mbins[i-1], Qbins[j] - Qbins[j - 1], points);
 }
+int spectralFunction::upper_bin(const double* edges, int num, double x)
+{
+	// same result as the linear scans in Mbin/Qbin: first i >= 1 with x < edges[i], else num-1
+	const double* it = std::upper_bound(edges + 1, edges + num, x);
+	return it == edges + num ? num - 1 : int(it - edges);
+}
+void spectralFunction::cell_table(double n, double T, int k, std::vector<double>& out)
+{
+	out.assign((size_t)num_Mbins * num_Qbins, 0.);
+	if (k < 0) return;
+	// barycentric weights of (n,T) in triangle k; planar interpolation through the three table values is exactly this combination
+	const int* t = &triangles[k][0];
+	double x0 = nT[t[0]][1], y0 = nT[t[0]][0];
+	double ax = nT[t[1]][1] - x0, ay = nT[t[1]][0] - y0, bx = nT[t[2]][1] - x0, by = nT[t[2]][0] - y0;
+	double det = ax * by - ay * bx;
+	double dx = n - x0, dy = T - y0;
+	double w1 = (dx * by - dy * bx) / det, w2 = (ax * dy - ay * dx) / det, w0 = 1 - w1 - w2;
+	for (int i = 0; i < num_Mbins; i++)
+		for (int j = 0; j < num_Qbins; j++)
+			out[(size_t)i * num_Qbins + j] = w0 * table[t[0]][i][j] + w1 * table[t[1]][i][j] + w2 * table[t[2]][i][j];
+}
+double spectralFunction::spectral_function_cell(const std::vector<double>& cell, int k, double M, double Q) const
+{
+	if (k == -1) return -3 * M * M / 12 / PI * e_sq;
+	int i = upper_bin(Mbins, num_Mbins, M), j = upper_bin(Qbins, num_Qbins, Q);
+	const double* r0 = &cell[(size_t)(i - 1) * num_Qbins];
+	const double* r1 = &cell[(size_t)i * num_Qbins];
+	double dx = Mbins[i] - Mbins[i - 1], dy = Qbins[j] - Qbins[j - 1];
+	double x = M - Mbins[i - 1], y = Q - Qbins[j - 1];
+	double a1 = (r0[j] - r0[j - 1]) * y / dy + r0[j - 1];
+	double a2 = (r1[j] - r1[j - 1]) * y / dy + r1[j - 1];
+	return g * ((a2 - a1) * x / dx + a1);
+}
 int spectralFunction::Triangle(double n, double T)
 {
+	// try the previous triangle first (consecutive cells have similar (n,T)); the planar interpolation is continuous
+	// across shared edges, so any triangle containing the point gives the same value
+	if (last_triangle >= 0 && isin(&triangles[last_triangle][0], n, T)) return last_triangle;
+
 	//std::cout << "trying to find triangle in " <<triangles.size()<< std::endl;
 	for (int i = 0; i < triangles.size() ; i++)
 	{
@@ -205,8 +243,7 @@ int spectralFunction::Triangle(double n, double T)
 		//std::cout<<i<<std::endl;
 		if (spectralFunction::isin(&triangles[i][0], n, T))
 		{
-			//std::cout << "found triangle" << std::endl;
-
+			last_triangle = i;
 			return i;
 		}
 	}
