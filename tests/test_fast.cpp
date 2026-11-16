@@ -8,7 +8,8 @@
 
 int main()
 {
-	dileptons d; d.init();
+	dileptons d; d.init(false);                       // exact triangulation path
+	dileptons dg; dg.init(true);                      // square-grid path
 	std::mt19937_64 gen(1);
 	std::uniform_real_distribution<double> U(0, 1);
 	double maxrel = 0, tol_outside = 0; long npts = 0, nin = 0, nout = 0;
@@ -32,6 +33,28 @@ int main()
 			maxrel = std::max(maxrel, fabs(a - r1) / (fabs(a) + 1e-300));
 		}
 	}
+	// square-grid path vs exact triangulation: whole collapsed tables and emission rates
+	double tab_err = 0, em_err = 0, em_mean = 0; long ncmp = 0, nout_mismatch = 0;
+	for (int cell = 0; cell < 400; cell++)
+	{
+		double T = 40 + 140 * U(gen), n = 0.5 + 21.5 * U(gen);
+		d.set_cell(n, T); dg.set_cell(n, T);
+		if ((d.cell_k < 0) != (dg.cell_k < 0)) { nout_mismatch++; continue; }
+		if (d.cell_k < 0) continue;
+		double mx = 0, e = 0;
+		for (double x : d.cell) mx = std::max(mx, fabs(x));
+		for (size_t q = 0; q < d.cell.size(); q++) e = std::max(e, fabs(d.cell[q] - dg.cell[q]) / mx);
+		tab_err = std::max(tab_err, e); ncmp++;
+		double vT = 0.5 * U(gen), vz = 0.2 * (U(gen) - .5), gamma = 1 / sqrt(1 - vT * vT - vz * vz);
+		for (int p = 0; p < 200; p++)
+		{
+			double M = 20 + 1480 * U(gen), pT = 20 + 2500 * U(gen), y = -.5 + U(gen), th = 2 * PI * U(gen) - PI;
+			double a = d.emission_cell(M, pT, y, gamma, vT, vz, th), b = dg.emission_cell(M, pT, y, gamma, vT, vz, th);
+			double r = fabs(a - b) / (fabs(a) + 1e-300); em_err = std::max(em_err, r); em_mean += r;
+		}
+	}
+	printf("grid vs triangulation: %ld cells inside, %ld inside/outside mismatches (points on the boundary), max table error %.2e (relative to table max)\n", ncmp, nout_mismatch, tab_err);
+	printf("   emission rate: max relative difference %.2e, mean %.2e\n", em_err, em_mean / (200. * ncmp));
 	printf("cells inside the table region: %ld, outside: %ld, points: %ld\n", nin, nout, npts);
 	printf("max relative difference old/new: %.2e\n", maxrel);
 	// timing for one cell (1 cell = 88*39*40*36 = 4.9M points)

@@ -12,3 +12,5 @@ TriangFiles/[0-9]*-[0-9]*.dat
 
 .DS_Store
 _to_delete/
+
+tests/test_fast

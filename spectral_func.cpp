@@ -1,5 +1,6 @@
 #include "spectral_func.h"
 #include <algorithm>
+#include <cmath>
 
 int spectralFunction::Mbin(double M)
 {
@@ -272,10 +273,72 @@ bool spectralFunction::isin(int* triangle, double n, double T)
 	double ca = (b2*ax-ab*bx)/(a2*b2-ab*ab);
 	double cb = (a2 * bx - ab * ax) / (a2 * b2 - ab * ab);
 	
-	if (ca >= 0 && cb >= 0 && (ca + cb) < 1)
+	if (ca >= -1e-12 && cb >= -1e-12 && (ca + cb) <= 1 + 1e-12)   // small tolerance: points exactly on a shared edge (e.g. T on a table row) belong to the table region
 	{
 		return 1;
 	}
 	//std::cout<<"no"<<std::endl;
 	return 0;
+}
+
+std::vector<double> spectralFunction::grid;
+bool spectralFunction::grid_ready = false;
+int spectralFunction::g_nT = 0, spectralFunction::g_nn = 0;
+double spectralFunction::g_T0 = 0, spectralFunction::g_n0 = 0, spectralFunction::g_dT = 1, spectralFunction::g_dn = 1;
+
+bool spectralFunction::hull_edges(double T, double& nlo, double& nhi) const
+{
+	// the table points form 12 densities on each of the temperature rows; the region boundary is the straight line between row ends
+	const int NN = 12, rows = (int)nT.size() / NN;
+	if (T < nT[0][0] || T > nT[(rows - 1) * NN][0]) return false;
+	int s = 0;
+	while (s < rows - 2 && T >= nT[(s + 1) * NN][0]) s++;
+	double f = (T - nT[s * NN][0]) / (nT[(s + 1) * NN][0] - nT[s * NN][0]);
+	nlo = (1 - f) * nT[s * NN][1] + f * nT[(s + 1) * NN][1];
+	nhi = (1 - f) * nT[s * NN + NN - 1][1] + f * nT[(s + 1) * NN + NN - 1][1];
+	return true;
+}
+
+void spectralFunction::build_grid(double dT, double dn)
+{
+	if (grid_ready) return;
+	const int NN = 12, rows = (int)nT.size() / NN;
+	if (rows * NN != (int)nT.size()) { std::cerr << "build_grid: (n,T) points are not in rows of 12" << std::endl; return; }
+	double Tmin = nT[0][0], Tmax = nT[(rows - 1) * NN][0], nmin = 1e300, nmax = 0;
+	for (auto& p : nT) { nmin = std::min(nmin, p[1]); nmax = std::max(nmax, p[1]); }
+	g_T0 = Tmin; g_dT = dT; g_nT = (int)std::ceil((Tmax - Tmin) / dT) + 1;
+	g_n0 = nmin; g_dn = dn; g_nn = (int)std::ceil((nmax - nmin) / dn) + 1;
+	const size_t sz = (size_t)num_Mbins * num_Qbins;
+	grid.assign((size_t)g_nT * g_nn * sz, 0.);
+	std::vector<double> tmp;
+	for (int a = 0; a < g_nT; a++)
+		for (int b = 0; b < g_nn; b++)
+		{
+			double T = g_T0 + a * dT, n = g_n0 + b * dn, nlo, nhi;
+			double Tc = std::min(std::max(T, Tmin + 1e-6), Tmax - 1e-6);
+			hull_edges(Tc, nlo, nhi);
+			double nc = std::min(std::max(n, nlo + 1e-6), nhi - 1e-6);
+			int k = Triangle(nc, Tc);
+			if (k < 0) continue;                                   // cannot happen inside the strips
+			cell_table(n, T, k, tmp);                              // for nodes outside the region: planar extrapolation from the nearest triangle
+			std::copy(tmp.begin(), tmp.end(), grid.begin() + ((size_t)a * g_nn + b) * sz);
+		}
+	grid_ready = true;
+}
+
+bool spectralFunction::grid_cell(double n, double T, std::vector<double>& out) const
+{
+	double nlo, nhi;
+	if (!grid_ready || !hull_edges(T, nlo, nhi) || n < nlo || n > nhi) return false;
+	const size_t sz = (size_t)num_Mbins * num_Qbins;
+	int a = std::min((int)((T - g_T0) / g_dT), g_nT - 2), b = std::min((int)((n - g_n0) / g_dn), g_nn - 2);
+	double fT = (T - g_T0 - a * g_dT) / g_dT, fn = (n - g_n0 - b * g_dn) / g_dn;
+	const double* p00 = &grid[((size_t)a * g_nn + b) * sz];
+	const double* p01 = p00 + sz;
+	const double* p10 = &grid[((size_t)(a + 1) * g_nn + b) * sz];
+	const double* p11 = p10 + sz;
+	double w00 = (1 - fT) * (1 - fn), w01 = (1 - fT) * fn, w10 = fT * (1 - fn), w11 = fT * fn;
+	out.resize(sz);
+	for (size_t q = 0; q < sz; q++) out[q] = w00 * p00[q] + w01 * p01[q] + w10 * p10[q] + w11 * p11[q];
+	return true;
 }

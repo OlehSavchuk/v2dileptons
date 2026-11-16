@@ -21,6 +21,7 @@ triangulation of the grid in the `(n, T)` plane (`triangles.dat`), then bilinear
 | `dileptons-script.bash` | Prints the `sbatch` lines for 3 EoS variants times 5 beam energies |
 | `Makefile` | `make` builds `a.out`, `make test` checks the fast path against the original rate (needs the `ImDvec` tables) |
 | `tests/test_fast.cpp` | Compares `emmision` with the per-cell fast path and times both |
+| `nTRapp.ipynb`, `rho-spectra-function.txt`, `Tn.dat`, `nt.dat` | Notebook and Rapp spectral-function output it reads (extracts the `(T, n)` points, Delaunay triangulation) |
 | `tools/triangulation.py` | Verifies `triangles.dat` (strip structure, coverage) and can write a new strip triangulation |
 | `docs/index.md` | Detailed documentation |
 
@@ -41,7 +42,9 @@ make                                   # g++ -O2 -std=c++14 -fopenmp ...
 The triangle search itself (once per cell, 308 triangles) was never the bottleneck: the cost is the 4.9 million emission evaluations per cell
 (88 `M` x 39 `pT` x 40 `y` x 36 azimuth bins). The code now does the triangle search and the planar `(n, T)` interpolation of the whole
 `M x pT` table once per cell, hoists everything that does not depend on the azimuth out of the inner loop, and uses binary search for the bins.
-`make test`: results agree with the original `dileptons::emmision` to 4e-14 (relative), and one cell takes about 0.015 s instead of about 0.4 s (25x).
+`make test`: with the exact triangulation the results agree with the original `dileptons::emmision` to 4e-14 (relative), and one cell takes about 0.015 s instead of about 0.4 s (25x).
+
+By default the code now uses a **square (T, n) grid** instead of the triangle search: the tables are sampled once on a regular grid (T step 5 MeV, n step 0.25, 69 MB shared by all threads) and each cell does a bilinear interpolation of four nodes. This costs some accuracy (see `docs/index.md`: table values differ from the triangulation by at most 0.4% of the table maximum, typically 0.03%); `dileptons::init(false)` selects the exact triangulation.
 
 ## Data
 

@@ -57,10 +57,27 @@ Interpolation: planar interpolation in `(n, T)` over the triangle that contains 
 * Result: relative difference to the original rates 4e-14 (random cells, including cells outside the triangulated region), 0.015 s instead of about 0.4 s per cell.
   Further speed-up is possible by caching `exp(E*/T)`, which is the largest remaining cost, or by a tabulated `Im D` on a `(M, Q)` grid shared by all cells with the same triangle.
 
-## Triangulation (`tools/triangulation.py`)
+## Square-grid interpolation (default)
+
+The triangle search is replaced by a regular grid in `(T, n)`: `spectralFunction::build_grid(dT = 5, dn = 0.25)` samples the collapsed `M x Q` tables at
+`29 x 84` nodes once (shared by all OpenMP threads, 69 MB), filling nodes outside the table region by planar extrapolation from the nearest triangle, and `grid_cell(n, T)`
+does a bilinear interpolation of the four surrounding nodes. Whether a point is inside the table region is an O(1) test against the straight boundary lines between the row ends
+(outside: the same vacuum value as with `Triangle() == -1`).
+
+Accuracy against the exact triangulation (`make test`, random cells): the collapsed table differs by at most 3.9e-3 of the table maximum (median 2.4e-4), and the emission rate by
+at most 1e-2 (mean 3e-4) in relative terms. The data exist only at 180 points, so a finer grid cannot add information; it only approaches the piecewise-linear result
+(`dT = 2.5, dn = 0.1`: 338 MB, maximum 1.6e-3). If the spectral functions are ever recomputed on a regular `(T, n)` grid, this bilinear lookup becomes exact.
+`dileptons::init(false)` uses the exact triangulation instead (about the same speed; the triangle search is not the bottleneck).
+`isin` has a `1e-12` tolerance so that points exactly on a table row (e.g. `T = 120`) are not mistaken for points outside the region.
+
+## Triangulation (`tools/triangulation.py`, `nTRapp.ipynb`)
+
+`nTRapp.ipynb` reads Rapp's output `rho-spectra-function.txt`, extracts the `(T, n/n0)` points of the table blocks (`Tn.dat`), loads `nt.dat` (a `(T, n)` point list, filtered to `T > 50`,
+`n > 0.9`) and builds a Delaunay triangulation of it with `matplotlib.tri`. Its point list (`nt.dat` has 93 points) is not the 180-point set of `TriangFiles/nTs.dat`, and the notebook does not
+write `triangles.dat`, so it is not clear that it produced the shipped file.
 
 `triangles.dat` has a strip structure: 15 temperature rows with 12 densities each; between neighbouring rows every one of the 11 quadrilaterals is cut into two
-triangles along one diagonal (14 strips x 11 x 2 = 308). The notebook that originally produced the file is not in this repository, and the choice of diagonals does not follow a
+triangles along one diagonal (14 strips x 11 x 2 = 308). The choice of diagonals does not follow a
 simple rule (shorter diagonal in any scaling, or Delaunay, reproduces it), so keep the shipped file. `python3 tools/triangulation.py` verifies it; `--write <file>` writes a new strip triangulation with shorter diagonals.
 
 ## Cluster scripts

@@ -50,6 +50,12 @@ class spectralFunction
     double LinearInterpolate(double, double, double, double, std::vector<std::vector<double>>&);
     void readEvent(std::vector<std::vector<double>>&, std::ifstream&);
     void readHeader(std::ifstream& );
+    // Regular (T, n) grid of collapsed M x Q tables, shared by all threads (built once from the triangulated tables).
+    static std::vector<double> grid;
+    static bool grid_ready;
+    static int g_nT, g_nn;
+    static double g_T0, g_n0, g_dT, g_dn;
+    bool hull_edges(double T, double& nlo, double& nhi) const;   // density range of the table region at temperature T
     int last_triangle = -1;                 // triangle of the previous lookup (neighbouring cells share it)
     static int upper_bin(const double* edges, int num, double x);
 public:
@@ -57,6 +63,11 @@ public:
     // (cell_table), and each (M,Q) evaluation is only a bilinear interpolation (spectral_function_cell).
     void cell_table(double n, double T, int k, std::vector<double>& out);          // out: num_Mbins*num_Qbins, row = M bin
     double spectral_function_cell(const std::vector<double>& cell, int k, double M, double Q) const;
+    // Square-grid path: no triangle search. build_grid samples the (triangulated) tables on a regular (T, n) grid once
+    // (nodes outside the table region are filled by planar extrapolation); grid_cell then needs 4 nodes and a bilinear
+    // interpolation. Returns false outside the table region (caller uses the vacuum value, like Triangle() == -1).
+    void build_grid(double dT = 5., double dn = 0.25);
+    bool grid_cell(double n, double T, std::vector<double>& out) const;
     void set_table(std::string, int,int);
     double spectral_function(double, double, int , double , double );
     int Triangle(double, double);
