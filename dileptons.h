@@ -1,10 +1,10 @@
-#ifndef DILEPTONSCLASS_H
-#define DILEPTONSCLASS_H
+#ifndef DILEPTONS_H
+#define DILEPTONS_H
 
 #define PI 3.14159265
 #define alphaEM 0.0072973525693
 #include <fstream>
-#include "spectral_func.h"
+#include "spectral_function.h"
 #include <iostream>
 #include <vector>
 #include <math.h>
@@ -19,11 +19,10 @@ public:
 	double qCM(std::vector<double>&,std::vector<double>&,double);
 	double fBE(double, double);
 	double L(double);
-	void init(bool use_grid = true);   // use_grid: square (T, n) grid path (default); false: exact triangulation
+	void init();
 	// fast path: prepare a cell once, then evaluate many phase-space points
 	std::vector<double> cell;
 	int cell_k = -1;
-	bool grid_mode = false;
 	double cell_T = 1;
 	void set_cell(double n, double T);   // also stores T
 	// all azimuth angles at once: cosTheta[0..n-1] given, out[0..n-1] = emission rate (hoists the cosh/sinh/sqrt that do not depend on theta)

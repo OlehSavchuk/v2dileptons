@@ -1,4 +1,4 @@
-#include "dileptonsclass.h"
+#include "dileptons.h"
 #include <algorithm>
 #include <string>
 #include <omp.h>

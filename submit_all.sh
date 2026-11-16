@@ -8,6 +8,6 @@ do
     for e in ${!ener[@]}
     do
 	path2=\'$path1${EOS[eos]}'/'${ener[e]}\'
-	echo 'sbatch dileptons.sh '$path2' 1 60'
+	echo 'sbatch run_dileptons.slurm '$path2' 1 60'
     done
 done

@@ -38,7 +38,7 @@ CORES=40
 
     FLDR=${SCRATCHDIR}/$PROJECTNAME
     echo $FLDR
-    ./a.out $FLDR ${2} ${3} 20
+    ./dilepton_v2 $FLDR ${2} ${3} 20
 
 
 wait

@@ -1,4 +1,4 @@
-#include "dileptonsclass.h"
+#include "dileptons.h"
 int dileptons::get_Triangle(double n, double T)
 {
 	return Rapp.Triangle(n, T);
@@ -17,11 +17,9 @@ double dileptons::qCM(std::vector<double>& q, std::vector<double>& v,double thet
 	return qcm;
 	
 }
-void dileptons::init(bool use_grid)
+void dileptons::init()
 {
 	Rapp.set_table("./TriangFiles/",308,180);
-	grid_mode = use_grid;
-	if (use_grid) Rapp.build_grid();      // shared by all threads; the first call builds it
 }
 
 double dileptons::emmision(std::vector<double>& q, std::vector<double>& v,int k, double n, double T,double theta)
@@ -49,11 +47,6 @@ double dileptons::L(double M)
 void dileptons::set_cell(double n, double T)
 {
 	cell_T = T;
-	if (grid_mode)
-	{
-		cell_k = Rapp.grid_cell(n, T, cell) ? 0 : -1;      // 0 = inside the table region, -1 = outside (vacuum value)
-		return;
-	}
 	cell_k = Rapp.Triangle(n, T);
 	Rapp.cell_table(n, T, cell_k, cell);
 }
