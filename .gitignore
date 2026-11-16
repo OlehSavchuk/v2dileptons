@@ -1,0 +1,14 @@
+# build products and run output
+a.out
+*.o
+*.log
+rho-V2-*.bin
+complete-massSpectra-*.dat
+
+# large model tables (338 MB of Rapp-type spectral functions; keep them out of git, see README)
+TriangFiles/ImDvec_T_*.out
+# 4274 small files (17 MB) that the code does not read
+TriangFiles/[0-9]*-[0-9]*.dat
+
+.DS_Store
+_to_delete/
